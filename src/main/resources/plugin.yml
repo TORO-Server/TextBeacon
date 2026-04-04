@@ -1,0 +1,23 @@
+name: TextBeacon
+version: '${version}'
+main: prj.salmon.textbeacon.TextBeacon
+api-version: '1.20'
+
+commands:
+  tb:
+    description: TextBeaconの管理コマンド
+    usage: /tb <message|on|off> | /tb <list [owner:<name>]|info|remove|show>
+
+permissions:
+  textbeacon.use:
+    description: TextBeaconのメッセージを受け取る権限
+    default: true
+  textbeacon.create:
+    description: TextBeacon看板を作成する権限
+    default: true
+  textbeacon.remove:
+    description: TextBeaconを削除する権限
+    default: op
+  textbeacon.admin:
+    description: TextBeaconの範囲を可視化を利用する権限
+    default: op
