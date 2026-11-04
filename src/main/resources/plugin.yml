@@ -14,7 +14,7 @@ permissions:
     default: true
   textbeacon.create:
     description: TextBeacon看板を作成する権限
-    default: true
+    default: op
   textbeacon.remove:
     description: TextBeaconを削除する権限
     default: op

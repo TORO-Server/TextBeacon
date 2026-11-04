@@ -15,7 +15,18 @@
 2. その看板を空色ガラスの近く（半径5ブロック以内）に設置する
 3. ガラスが5x5x5を超えていなければそこにBeaconが作成される
 
+ガラスは消えるため、保護されたガラスが1つでも含まれているとBeaconは作成されません。
+
 ## opコマンド
 
 - `/tb list`
 - `/tb remove <uuid>` など
+
+## 権限
+
+| 権限 | 既定 | 内容 |
+|---|---|---|
+| `textbeacon.use` | true | メッセージを受け取る |
+| `textbeacon.create` | op | Beaconを作成する (建築権限のあるグループに付与します) |
+| `textbeacon.remove` | op | 他の人のBeaconを削除する |
+| `textbeacon.admin` | op | 管理コマンドを使う |
