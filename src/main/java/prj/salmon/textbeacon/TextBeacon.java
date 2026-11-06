@@ -22,6 +22,8 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BlockStateMeta;
+import org.bukkit.permissions.Permission;
+import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.BoundingBox;
@@ -92,6 +94,12 @@ public class TextBeacon extends JavaPlugin implements Listener, CommandExecutor,
         }
 
         startDebugTask();
+
+        // 同じ権限を他のプラグインが別の既定で登録していても、すべてのプラグインが有効になった後で op に揃える
+        Bukkit.getScheduler().runTask(this, () -> {
+            Permission permission = Bukkit.getPluginManager().getPermission("textbeacon.create");
+            if (permission != null) permission.setDefault(PermissionDefault.OP);
+        });
     }
 
     @Override
@@ -106,7 +114,8 @@ public class TextBeacon extends JavaPlugin implements Listener, CommandExecutor,
     // =========================
     // 看板設置
     // =========================
-    @EventHandler
+    // 保護プラグインの判定が終わった後に処理する
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onSign(SignChangeEvent e) {
         if (!e.getLine(0).equalsIgnoreCase("[TextBeacon]")) return;
         if (!e.getPlayer().hasPermission("textbeacon.create")) {
@@ -117,23 +126,26 @@ public class TextBeacon extends JavaPlugin implements Listener, CommandExecutor,
         tryRegisterBeacon(e.getPlayer(), e.getBlock().getLocation(), buildMessage(e));
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent e) {
         if (!(e.getBlockPlaced().getState() instanceof Sign sign)) return;
+
+        String itemMessage = extractItemMessage(e.getItemInHand());
+        boolean hasItemMessage = itemMessage != null && !itemMessage.isBlank();
+
+        // TextBeaconの看板でなければ何もしない
+        if (!hasItemMessage && !"[TextBeacon]".equalsIgnoreCase(sign.getSide(Side.FRONT).getLine(0))) return;
 
         if (!e.getPlayer().hasPermission("textbeacon.create")) {
             e.getPlayer().sendMessage("§cこの操作を行う権限がありません (textbeacon.create)");
             return;
         }
 
-        String itemMessage = extractItemMessage(e.getItemInHand());
-        if (itemMessage != null && !itemMessage.isBlank()) {
+        if (hasItemMessage) {
             e.setCancelled(true);
             placeBeaconSign(e, sign.getLocation(), itemMessage);
             return;
         }
-
-        if (!"[TextBeacon]".equalsIgnoreCase(sign.getSide(Side.FRONT).getLine(0))) return;
 
         BlockKey signKey = new BlockKey(sign.getLocation());
         if (signMap.containsKey(signKey)) return;
@@ -162,6 +174,11 @@ public class TextBeacon extends JavaPlugin implements Listener, CommandExecutor,
             return false;
         }
 
+        if (!canBreakAll(player, glass)) {
+            player.sendMessage("§c保護されたガラスが含まれているため、Beaconを設置できません");
+            return false;
+        }
+
         UUID id = UUID.randomUUID();
         Beacon beacon = new Beacon(id, base, msg, player.getUniqueId(), player.getName());
         signMap.put(beacon.sign, id);
@@ -182,10 +199,21 @@ public class TextBeacon extends JavaPlugin implements Listener, CommandExecutor,
         return true;
     }
 
+    // すべてのブロックについて、プレイヤーが壊してよいかを保護プラグインなどに確認する
+    // 1つでも拒否されたらどのブロックも消さないよう、消す前にまとめて確認する
+    private boolean canBreakAll(Player player, List<Location> locations) {
+        for (Location loc : locations) {
+            BlockBreakEvent check = new BlockBreakEvent(loc.getBlock(), player);
+            Bukkit.getPluginManager().callEvent(check);
+            if (check.isCancelled()) return false;
+        }
+        return true;
+    }
+
     // =========================
     // 看板破壊
     // =========================
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent e) {
         if (!(e.getBlock().getState() instanceof Sign)) return;
 
